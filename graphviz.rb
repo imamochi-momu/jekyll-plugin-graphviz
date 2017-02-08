@@ -1,46 +1,16 @@
+# encoding: utf-8
+#
 # (The MIT License)
-# 
-# Copyright © 2013 Ibrahim Maguiraga
-# 
-# Permission is hereby granted, free of charge, to any person obtaining a copy of
-# this software and associated documentation files (the ‘Software’), to deal in
-# the Software without restriction, including without limitation the rights to
-# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-# of the Software, and to permit persons to whom the Software is furnished to do
-# so, subject to the following conditions:
-# 
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-# 
-# THE SOFTWARE IS PROVIDED ‘AS IS’, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-# ##Command to produce the output: "neato -Tsvg frameworks.gv  > neato-frameworks.svg  &&  dot -Tsvg frameworks.gv > dot-frameworks.svg  &&  circo -Tsvg frameworks.gv > circo-frameworks.svg &&  twopi -Tsvg frameworks.gv > twopi-frameworks.svg &&  fdp -Tsvg frameworks.gv > fdp-frameworks.svg && sfdp -Tsvg frameworks.gv > sfdp-frameworks.svg && patchwork -Tsvg frameworks.gv > patch-frameworks.svg"
-
-# dot -Kneato -Tsvg -o framewoks.svg frameworks.gv 
 
 require 'digest'
 require 'liquid'
 require 'open3'
 
-#relative to current directory
-
 module Jekyll
-  module XTags
+  module Graphviz
     class XGraphvizBlock < Liquid::Block
       include Liquid::StandardFilters
-#xgraphix:
-# destination  : "images/graphviz"
-#
-      #safe true
-      #priority :low
-
-      GRAPHVIZ_DIR = "images/graphviz"
+      GRAPHVIZ_DIR = "image/graphviz"
       DIV_CLASS_ATTR = "container"
       # The regular expression syntax checker. Start with the language specifier.
       # Follow that by zero or more space separated options that take one of two
@@ -52,9 +22,8 @@ module Jekyll
 
       def initialize(tag_name, markup, tokens)
         super
-        puts("\n-> initialize "+markup)
+        puts("\n-> initialize " + markup)
 
-        @layout = "unknown"
         @inline = true
         @link = false
         @url = "#{Digest::MD5.hexdigest(Time.now.to_s)}.gv"
@@ -62,156 +31,73 @@ module Jekyll
         @class = ""
         @style = ""
         @graphviz_dir = GRAPHVIZ_DIR
-        
 
         @format, @params = markup.strip.split(' ', 2);
         @tag_name = tag_name
-        case tag_name
-          when 'xdot' then  
-            @layout = "dot"
-          when 'xneato' then  
-            @layout = "neato"
-          when 'xtwopi' then  
-            @layout = "twopi"
-          when 'xcirco' then  
-            @layout = "circo"
-          else 
-            raise "unknown liquid tag name: #{tag_name}"
-        end
-        #initialize options       
-        parse_options(@params,tag_name)
-   
+        @layout = "dot"
+        #initialize options
+        parse_args(markup)
+
       end
 
       def read_config(name, site)
-        cfg = site.config["xgraphviz"]
+        cfg = site.config["graphviz"]
         return if cfg.nil?
         value = cfg[name]
       end
-
 
       def split_params(params)
         return params.split(" ").map(&:strip)
       end
 
-      def parse_options(params,tag_name)
-          if not(defined?(@format)) or @format.nil?
-            @format = "svg"
+      def parse_args(markup)
+        args = markup.split(/(\w+=".*")|(\w+=.+)/).select {|s| !s.strip.empty?}
+        p args
+        args.each do |arg|
+          arg.strip!
+          if arg =~ /(\w+)="(.*)"/
+            eval("@#{$1} = \'#{$2}\'")
+            p "@1:#{$1} = #{$2}"
+            next
           end
-
-          if defined?(params) && not( params.nil?)
-            if defined?(params) && params != ''
-              puts("===> params -> "+params.to_s)
-              options = split_params(params)
-
-                options.each do |opt|
-                    key, value = opt.split('=')
-                      unless value.nil? or value.empty? then
-                        value = value.gsub(/[\\'\\"]/,"")
-                      end
-
-                    puts("===> option [#{key} = #{value}]")
-                    case key
-                      when 'svg' then  
-                        @format = key
-
-                      when 'class' then  
-                        @class = value
-
-                      when 'style' then  
-                        @style = value
-
-                      when 'png' then  
-                        @format = key
-                        @inline = false
-
-                      when 'format' then  
-                        unless value.nil? or value.empty? then 
-                          @format = value
-                        end
-                        
-                      when 'opts' then  
-                        unless value.nil? or value.empty? then
-                          @opts = value
-                        end
-
-                      when 'url' then  
-                        unless value.nil? or value.empty? then
-                          @url = value
-                          @link = true
-                        end
-                        
-                      when 'inline' then  
-                        @inline=true
-                        unless value.nil? or value.empty? then
-                          @inline = value == 'true'
-                        end
-
-                      else 
-                        puts "unsupported option: #{key}"
-                    end
-                    
-                end
-                
-              #end
-            else
-              raise SyntaxError.new <<-eos
-            Syntax Error in tag #{tag_name} while parsing the following markup:
-
-              #{params}
-
-            Valid syntax: <xdot|xneato|xcirco|xtwopi> <png|svg> [param='value' param2='value'] 
-            param='value': i.e(keep=<true|false> inline=<true|false> url=<filename> h=<height> w=<width> opts=<options>)
-
-            eos
-            end
+          if arg =~ /(\w+)=(.+)/
+            eval("@#{$1} = \'#{$2}\'")
+            p "@2:#{$1} = #{$2}"
+            next
           end
-
-          if @format == 'png' then 
-            @inline = false
-          end
+        end
       end
 
-
-      def render(context) 
-      #initialize options 
+      def render(context)
+      #initialize options
         site = context.registers[:site]
         value = read_config("destination", site)
-      
+
         @graphviz_dir = value if !value.nil?
-      
-       puts("\n=> render")      
+
+       puts("\n=> render")
         folder = File.join(site.source, @graphviz_dir) #dest
         FileUtils.mkdir_p(folder)
-            
+
         puts("\tfolder -> "+folder.to_s)
           puts("\tinline -> #{@inline}")
           puts("\tlink -> #{@link}")
           puts("\turl -> #{@url}")
           puts("\tlayout -> #{@layout}")
           puts("\tformat -> #{@format}")
-       
+
         non_markdown = /(&amp|&lt|&nbsp|&quot|&gt|<\/p>|<\/h.>)/m
-        
+
         # preprocess text
         code = super
-  
-        # Used for debug..
-        # fd = IO.sysopen "/dev/tty", "w"
-        # ios = IO.new(fd,"w")
-        # ios.puts code
-   
+
         svg = ""
         inputfile = nil
 
-        if @link == true then
-          inputfile = File.join(site.source,@url)   
-        else
-          @url = "#{Digest::MD5.hexdigest(code)}.gv"  
-        end 
-        svg = generate_graph_from_content(context, code,folder,inputfile)   
+        @url = "#{Digest::MD5.hexdigest(code)}.gv"
+        svg = generate_graph_from_content(context, code, folder, inputfile)
         output = wrap_with_div(svg)
-        
+
         output
         #output trigger last stdout is what gets display
       end
@@ -221,46 +107,30 @@ module Jekyll
       end
 
       def generate_graph_from_content(context, code, folder, inputfile)
-        dot_cmd = ""     
         site = context.registers[:site]
-
-        if @inline == true then
-          dot_cmd = "dot -K#{@layout} -T#{@format} #{@opts} #{inputfile}"
-
-          svg = run_dot_cmd(dot_cmd,code)
-          #svg = remove_declarations(svg)
-          return svg
-
-        else
-          filename = "gen-"+File.basename(@url)+"."+@format
-          destination = File.join(folder,filename).strip
+        filename = File.basename(@url, ".gv") + "." + @format
+        output = File.join(@graphviz_dir, filename)
+        unless File.exist?(output) then
+          destination = File.join(folder, filename).strip
           dot_cmd = "dot -K#{@layout} -T#{@format} -o #{destination} #{@opts} #{inputfile}"
-          output = File.join(@graphviz_dir,filename)
-
-          run_dot_cmd(dot_cmd,code)       
-          puts("\n output ="+output)
-          # Add the file to the list of static files for the final copy once generated
-          st_file = Jekyll::StaticFile.new(site, site.source, @graphviz_dir, filename)#@graphviz_dir, filename)
-          site.static_files << st_file
-
-          if @style.empty? or @style.nil?
-            @style = ""
-          else
-            @style = %[style="#{@style}"]
-          end
-
-          return "<img #{@style} src='#{output}'>" 
+          run_dot_cmd(dot_cmd, code)
+          puts("\n output =" + output)
         end
+        # Add the file to the list of static files for the final copy once generated
+        st_file = Jekyll::StaticFile.new(site, site.source, @graphviz_dir, filename)#@graphviz_dir, filename)
+        site.static_files << st_file
+
+        if @style.empty? or @style.nil?
+          @style = ""
+        else
+          @style = %[style="#{@style}"]
+        end
+
+        return "<img #{@style} src='#{output}'>"
       end
 
       def run_dot_cmd(dot_cmd,code)
         puts("\tdot_cmd -> "+dot_cmd)
-        #IO.popen(dot_cmd, 'w') do |pipe|
-        #  pipe.puts(code)
-        #  pipe.close_write
-        #end
-        #Process.spawn(dot_cmd)
-        #
         Open3.popen3( dot_cmd ) do |stdin, stdout, stderr, wait_thr|
           stdout.binmode
           stdin.print(code)
@@ -272,7 +142,7 @@ module Jekyll
           end
 
           svg = stdout.read
-          
+
           svg.force_encoding('UTF-8')
           exit_status = wait_thr.value
             unless exit_status.success?
@@ -294,18 +164,24 @@ module Jekyll
 
       def wrap_with_div(svg)
         if @class.empty? or @class.nil?
-          @class = ""
+          classNames = %[class="graphviz"]
         else
-          @class = %[class="#{@class}"]
+          classNames = %[class="graphviz #{@class}"]
         end
 
         if @style.empty? or @style.nil?
-          @style = ""
+          style = ""
         else
-          @style = %[style="#{@style}"]
+          style = %[style="#{@style}"]
         end
 
-        %[<div #{@class} #{@style} >#{svg}</div>]
+        if @caption.nil? or @caption.empty?
+          caption = ""
+        else
+          caption = %[<figcaption>#{@caption}</figcaption>]
+        end
+
+        %[<figure #{classNames} #{style} ><div class="graphviz">#{svg}</div>#{caption}</figure>]
       end
 
     end
@@ -313,7 +189,4 @@ module Jekyll
   end
 end
 
-Liquid::Template.register_tag('xdot', Jekyll::XTags::XGraphvizBlock)
-Liquid::Template.register_tag('xneato', Jekyll::XTags::XGraphvizBlock)
-Liquid::Template.register_tag('xtwopi', Jekyll::XTags::XGraphvizBlock)
-Liquid::Template.register_tag('xcirco', Jekyll::XTags::XGraphvizBlock)
+Liquid::Template.register_tag('graphviz', Jekyll::Graphviz::XGraphvizBlock)
