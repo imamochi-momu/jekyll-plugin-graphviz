@@ -126,7 +126,7 @@ module Jekyll
           @style = %[style="#{@style}"]
         end
 
-        return "<img #{@style} src='#{output}'>"
+        return "<img #{@style} src='/#{output}'>"
       end
 
       def run_dot_cmd(dot_cmd,code)
